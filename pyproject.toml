@@ -1,0 +1,10 @@
+[project]
+name = "agent-trace-receipts"
+version = "0.1.0"
+description = "Tamper-evident traces for AI agent runs, with a verifier that refuses bad ones."
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,357 @@
+{
+  "_synthetic": "SYNTHETIC DATA authored for this repository. Not production data, not client data. Vendors and amounts are invented.",
+  "invoices": [
+    {
+      "invoice_id": "INV-1001",
+      "invoice_number": "A-1001",
+      "vendor": "Birch Packaging",
+      "po_id": "PO-5001",
+      "lines": [
+        {
+          "sku": "SKU-103",
+          "qty": 7,
+          "unit_price_cents": 1125
+        },
+        {
+          "sku": "SKU-104",
+          "qty": 9,
+          "unit_price_cents": 1165
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1002",
+      "invoice_number": "A-1002",
+      "vendor": "Cedar Logistics",
+      "po_id": "PO-5002",
+      "lines": [
+        {
+          "sku": "SKU-106",
+          "qty": 9,
+          "unit_price_cents": 1250
+        },
+        {
+          "sku": "SKU-107",
+          "qty": 11,
+          "unit_price_cents": 1290
+        },
+        {
+          "sku": "SKU-108",
+          "qty": 13,
+          "unit_price_cents": 1330
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1003",
+      "invoice_number": "A-1003",
+      "vendor": "Dunmore Tooling",
+      "po_id": "PO-5003",
+      "lines": [
+        {
+          "sku": "SKU-109",
+          "qty": 11,
+          "unit_price_cents": 1375
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1004",
+      "invoice_number": "A-1004",
+      "vendor": "Elm Textiles",
+      "po_id": "PO-5004",
+      "lines": [
+        {
+          "sku": "SKU-112",
+          "qty": 13,
+          "unit_price_cents": 1500
+        },
+        {
+          "sku": "SKU-113",
+          "qty": 15,
+          "unit_price_cents": 1540
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1005",
+      "invoice_number": "A-1005",
+      "vendor": "Alder Fasteners",
+      "po_id": "PO-5005",
+      "lines": [
+        {
+          "sku": "SKU-115",
+          "qty": 15,
+          "unit_price_cents": 1625
+        },
+        {
+          "sku": "SKU-116",
+          "qty": 17,
+          "unit_price_cents": 1665
+        },
+        {
+          "sku": "SKU-117",
+          "qty": 19,
+          "unit_price_cents": 1705
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1006",
+      "invoice_number": "A-1006",
+      "vendor": "Birch Packaging",
+      "po_id": "PO-5006",
+      "lines": [
+        {
+          "sku": "SKU-118",
+          "qty": 17,
+          "unit_price_cents": 1750
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1007",
+      "invoice_number": "A-1007",
+      "vendor": "Cedar Logistics",
+      "po_id": "PO-5007",
+      "lines": [
+        {
+          "sku": "SKU-121",
+          "qty": 19,
+          "unit_price_cents": 1875
+        },
+        {
+          "sku": "SKU-122",
+          "qty": 21,
+          "unit_price_cents": 1915
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1008",
+      "invoice_number": "A-1008",
+      "vendor": "Dunmore Tooling",
+      "po_id": "PO-5008",
+      "lines": [
+        {
+          "sku": "SKU-124",
+          "qty": 21,
+          "unit_price_cents": 2000
+        },
+        {
+          "sku": "SKU-125",
+          "qty": 23,
+          "unit_price_cents": 2040
+        },
+        {
+          "sku": "SKU-126",
+          "qty": 25,
+          "unit_price_cents": 2080
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1009",
+      "invoice_number": "A-1009",
+      "vendor": "Elm Textiles",
+      "po_id": "PO-5009",
+      "lines": [
+        {
+          "sku": "SKU-127",
+          "qty": 23,
+          "unit_price_cents": 2200
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1010",
+      "invoice_number": "A-1010",
+      "vendor": "Alder Fasteners",
+      "po_id": "PO-5010",
+      "lines": [
+        {
+          "sku": "SKU-130",
+          "qty": 25,
+          "unit_price_cents": 2325
+        },
+        {
+          "sku": "SKU-131",
+          "qty": 27,
+          "unit_price_cents": 2290
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1011",
+      "invoice_number": "A-1011",
+      "vendor": "Birch Packaging",
+      "po_id": "PO-5011",
+      "lines": [
+        {
+          "sku": "SKU-133",
+          "qty": 27,
+          "unit_price_cents": 2450
+        },
+        {
+          "sku": "SKU-134",
+          "qty": 29,
+          "unit_price_cents": 2415
+        },
+        {
+          "sku": "SKU-135",
+          "qty": 31,
+          "unit_price_cents": 2455
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1012",
+      "invoice_number": "A-1012",
+      "vendor": "Cedar Logistics",
+      "po_id": "PO-5012",
+      "lines": [
+        {
+          "sku": "SKU-136",
+          "qty": 32,
+          "unit_price_cents": 2500
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1013",
+      "invoice_number": "A-1013",
+      "vendor": "Dunmore Tooling",
+      "po_id": "PO-5013",
+      "lines": [
+        {
+          "sku": "SKU-139",
+          "qty": 34,
+          "unit_price_cents": 2625
+        },
+        {
+          "sku": "SKU-140",
+          "qty": 33,
+          "unit_price_cents": 2665
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1014",
+      "invoice_number": "A-1014",
+      "vendor": "Elm Textiles",
+      "po_id": "PO-5014",
+      "lines": [
+        {
+          "sku": "SKU-142",
+          "qty": 36,
+          "unit_price_cents": 2750
+        },
+        {
+          "sku": "SKU-143",
+          "qty": 35,
+          "unit_price_cents": 2790
+        },
+        {
+          "sku": "SKU-144",
+          "qty": 37,
+          "unit_price_cents": 2830
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1015",
+      "invoice_number": "A-1001",
+      "vendor": "Birch Packaging",
+      "po_id": "PO-5001",
+      "lines": [
+        {
+          "sku": "SKU-103",
+          "qty": 7,
+          "unit_price_cents": 1125
+        },
+        {
+          "sku": "SKU-104",
+          "qty": 9,
+          "unit_price_cents": 1165
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1016",
+      "invoice_number": "A-1002",
+      "vendor": "Cedar Logistics",
+      "po_id": "PO-5002",
+      "lines": [
+        {
+          "sku": "SKU-106",
+          "qty": 9,
+          "unit_price_cents": 1250
+        },
+        {
+          "sku": "SKU-107",
+          "qty": 11,
+          "unit_price_cents": 1290
+        },
+        {
+          "sku": "SKU-108",
+          "qty": 13,
+          "unit_price_cents": 1330
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1017",
+      "invoice_number": "A-1017",
+      "vendor": "Cedar Logistics",
+      "po_id": "PO-9901",
+      "lines": [
+        {
+          "sku": "SKU-151",
+          "qty": 39,
+          "unit_price_cents": 3125
+        },
+        {
+          "sku": "SKU-152",
+          "qty": 41,
+          "unit_price_cents": 3165
+        },
+        {
+          "sku": "SKU-153",
+          "qty": 43,
+          "unit_price_cents": 3205
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1018",
+      "invoice_number": "A-1018",
+      "vendor": "Dunmore Tooling",
+      "po_id": "PO-9902",
+      "lines": [
+        {
+          "sku": "SKU-154",
+          "qty": 41,
+          "unit_price_cents": 3250
+        }
+      ]
+    },
+    {
+      "invoice_id": "INV-1019",
+      "invoice_number": "A-1019",
+      "vendor": "Elm Textiles",
+      "po_id": "PO-9903",
+      "lines": [
+        {
+          "sku": "SKU-157",
+          "qty": 43,
+          "unit_price_cents": 3375
+        },
+        {
+          "sku": "SKU-158",
+          "qty": 45,
+          "unit_price_cents": 3415
+        }
+      ]
+    }
+  ]
+}

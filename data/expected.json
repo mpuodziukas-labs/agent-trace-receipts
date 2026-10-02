@@ -1,0 +1,73 @@
+{
+  "_synthetic": "SYNTHETIC DATA authored for this repository. Not production data, not client data. Vendors and amounts are invented.",
+  "expected": {
+    "INV-1001": {
+      "outcome": "approved"
+    },
+    "INV-1002": {
+      "outcome": "approved"
+    },
+    "INV-1003": {
+      "outcome": "approved"
+    },
+    "INV-1004": {
+      "outcome": "approved"
+    },
+    "INV-1005": {
+      "outcome": "approved"
+    },
+    "INV-1006": {
+      "outcome": "approved"
+    },
+    "INV-1007": {
+      "outcome": "approved"
+    },
+    "INV-1008": {
+      "outcome": "approved"
+    },
+    "INV-1009": {
+      "outcome": "flagged",
+      "reason": "price"
+    },
+    "INV-1010": {
+      "outcome": "flagged",
+      "reason": "price"
+    },
+    "INV-1011": {
+      "outcome": "flagged",
+      "reason": "price"
+    },
+    "INV-1012": {
+      "outcome": "flagged",
+      "reason": "quantity"
+    },
+    "INV-1013": {
+      "outcome": "flagged",
+      "reason": "quantity"
+    },
+    "INV-1014": {
+      "outcome": "flagged",
+      "reason": "quantity"
+    },
+    "INV-1015": {
+      "outcome": "flagged",
+      "reason": "duplicate"
+    },
+    "INV-1016": {
+      "outcome": "flagged",
+      "reason": "duplicate"
+    },
+    "INV-1017": {
+      "outcome": "flagged",
+      "reason": "missing_po"
+    },
+    "INV-1018": {
+      "outcome": "flagged",
+      "reason": "missing_po"
+    },
+    "INV-1019": {
+      "outcome": "flagged",
+      "reason": "missing_po"
+    }
+  }
+}

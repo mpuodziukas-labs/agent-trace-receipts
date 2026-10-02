@@ -1,0 +1,234 @@
+{
+  "_synthetic": "SYNTHETIC DATA authored for this repository. Not production data, not client data. Vendors and amounts are invented.",
+  "purchase_orders": [
+    {
+      "po_id": "PO-5001",
+      "vendor": "Birch Packaging",
+      "lines": [
+        {
+          "sku": "SKU-103",
+          "qty": 7,
+          "unit_price_cents": 1125
+        },
+        {
+          "sku": "SKU-104",
+          "qty": 9,
+          "unit_price_cents": 1165
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5002",
+      "vendor": "Cedar Logistics",
+      "lines": [
+        {
+          "sku": "SKU-106",
+          "qty": 9,
+          "unit_price_cents": 1250
+        },
+        {
+          "sku": "SKU-107",
+          "qty": 11,
+          "unit_price_cents": 1290
+        },
+        {
+          "sku": "SKU-108",
+          "qty": 13,
+          "unit_price_cents": 1330
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5003",
+      "vendor": "Dunmore Tooling",
+      "lines": [
+        {
+          "sku": "SKU-109",
+          "qty": 11,
+          "unit_price_cents": 1375
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5004",
+      "vendor": "Elm Textiles",
+      "lines": [
+        {
+          "sku": "SKU-112",
+          "qty": 13,
+          "unit_price_cents": 1500
+        },
+        {
+          "sku": "SKU-113",
+          "qty": 15,
+          "unit_price_cents": 1540
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5005",
+      "vendor": "Alder Fasteners",
+      "lines": [
+        {
+          "sku": "SKU-115",
+          "qty": 15,
+          "unit_price_cents": 1625
+        },
+        {
+          "sku": "SKU-116",
+          "qty": 17,
+          "unit_price_cents": 1665
+        },
+        {
+          "sku": "SKU-117",
+          "qty": 19,
+          "unit_price_cents": 1705
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5006",
+      "vendor": "Birch Packaging",
+      "lines": [
+        {
+          "sku": "SKU-118",
+          "qty": 17,
+          "unit_price_cents": 1750
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5007",
+      "vendor": "Cedar Logistics",
+      "lines": [
+        {
+          "sku": "SKU-121",
+          "qty": 19,
+          "unit_price_cents": 1875
+        },
+        {
+          "sku": "SKU-122",
+          "qty": 21,
+          "unit_price_cents": 1915
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5008",
+      "vendor": "Dunmore Tooling",
+      "lines": [
+        {
+          "sku": "SKU-124",
+          "qty": 21,
+          "unit_price_cents": 2000
+        },
+        {
+          "sku": "SKU-125",
+          "qty": 23,
+          "unit_price_cents": 2040
+        },
+        {
+          "sku": "SKU-126",
+          "qty": 25,
+          "unit_price_cents": 2080
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5009",
+      "vendor": "Elm Textiles",
+      "lines": [
+        {
+          "sku": "SKU-127",
+          "qty": 23,
+          "unit_price_cents": 2125
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5010",
+      "vendor": "Alder Fasteners",
+      "lines": [
+        {
+          "sku": "SKU-130",
+          "qty": 25,
+          "unit_price_cents": 2250
+        },
+        {
+          "sku": "SKU-131",
+          "qty": 27,
+          "unit_price_cents": 2290
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5011",
+      "vendor": "Birch Packaging",
+      "lines": [
+        {
+          "sku": "SKU-133",
+          "qty": 27,
+          "unit_price_cents": 2375
+        },
+        {
+          "sku": "SKU-134",
+          "qty": 29,
+          "unit_price_cents": 2415
+        },
+        {
+          "sku": "SKU-135",
+          "qty": 31,
+          "unit_price_cents": 2455
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5012",
+      "vendor": "Cedar Logistics",
+      "lines": [
+        {
+          "sku": "SKU-136",
+          "qty": 29,
+          "unit_price_cents": 2500
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5013",
+      "vendor": "Dunmore Tooling",
+      "lines": [
+        {
+          "sku": "SKU-139",
+          "qty": 31,
+          "unit_price_cents": 2625
+        },
+        {
+          "sku": "SKU-140",
+          "qty": 33,
+          "unit_price_cents": 2665
+        }
+      ]
+    },
+    {
+      "po_id": "PO-5014",
+      "vendor": "Elm Textiles",
+      "lines": [
+        {
+          "sku": "SKU-142",
+          "qty": 33,
+          "unit_price_cents": 2750
+        },
+        {
+          "sku": "SKU-143",
+          "qty": 35,
+          "unit_price_cents": 2790
+        },
+        {
+          "sku": "SKU-144",
+          "qty": 37,
+          "unit_price_cents": 2830
+        }
+      ]
+    }
+  ]
+}
