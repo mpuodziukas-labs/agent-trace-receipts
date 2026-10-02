@@ -67,9 +67,10 @@ purchase orders (11 total), plus 8 clean invoices that must be approved.
 
 ## Sample trace excerpt
 
-Two lines from the duplicate invoice `INV-1015` (real output of
-`TRACE_KEY=demo-key-not-secret-0 python3 agent.py --invoice INV-1015`; only
-timestamps and every `prev_hash` after the first vary by run).
+The first two lines of `traces/run-INV-1015.jsonl`, the duplicate invoice,
+after `TRACE_KEY=demo-key-not-secret-0 python3 agent.py --invoice INV-1015`
+(the command prints only `INV-1015 flagged (duplicate)`; the trace goes to the
+file). Only timestamps and every `prev_hash` after the first vary by run.
 Each line carries the HMAC-SHA256 of the previous raw line in `prev_hash`.
 
 <!-- sample:start -->
@@ -157,6 +158,10 @@ input and CLI contract tests, and checks of the README's own claims.
   (`verified N/M`). Compare against the list of runs you expect.
 - Steps are written when they finish and the trace is a single linear run.
   Concurrent or nested tool calls are not modeled.
+- The data directory is trusted. Replay checks a trace against the invoices
+  and purchase orders it is given; those files are not hashed or signed, so
+  someone who changes them and re-records with the key produces a trace that
+  verifies against the changed data.
 - Business rules are two examples for this invoice workflow. Other workflows
   need their own rules.
 - Synthetic data, one scripted agent, thirteen tamper classes. Real agents add
