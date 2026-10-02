@@ -8,6 +8,7 @@ import pytest
 
 import trace as tr
 
+KEY = b"unit-test-key-0123456789"  # matches TRACE_KEY set in conftest.py
 FIELDS = {
     "run_id", "step", "parent", "tool", "input", "input_sha256",
     "output", "output_sha256", "rc", "start_ms", "end_ms", "prev_hash",
@@ -42,8 +43,8 @@ def test_hash_chain_links_previous_raw_line(tmp_path):
     lines = read_lines(p)
     recs = [json.loads(x) for x in lines]
     assert recs[0]["prev_hash"] == tr.GENESIS
-    assert recs[1]["prev_hash"] == tr.sha256_text(lines[0])
-    assert recs[2]["prev_hash"] == tr.sha256_text(lines[1])
+    assert recs[1]["prev_hash"] == tr.chain_hash(KEY, lines[0])
+    assert recs[2]["prev_hash"] == tr.chain_hash(KEY, lines[1])
     assert [r["step"] for r in recs] == [0, 1, 2]
 
 
@@ -77,8 +78,30 @@ def test_head_anchor_matches_last_line(tmp_path):
             s.output = i
     head = json.loads(tr.head_path(p).read_text())
     assert head["steps"] == 2
-    assert head["last_hash"] == tr.sha256_text(read_lines(p)[-1])
+    assert head["last_hash"] == tr.chain_hash(KEY, read_lines(p)[-1])
 
 
 def test_canonical_is_key_order_independent():
     assert tr.sha256_json({"a": 1, "b": 2}) == tr.sha256_json({"b": 2, "a": 1})
+
+
+def test_chain_link_is_keyed_not_plain_sha256(tmp_path):
+    p = tmp_path / "t.jsonl"
+    rec = tr.Recorder(p, "r")
+    for i in range(2):
+        with rec.step("t", {"i": i}) as s:
+            s.output = i
+    lines = read_lines(p)
+    link = json.loads(lines[1])["prev_hash"]
+    assert link != tr.sha256_text(lines[0])
+    assert link == tr.chain_hash(KEY, lines[0]) != tr.chain_hash(b"another-key-0123456789", lines[0])
+
+
+@pytest.mark.parametrize("value", [None, "", "short"])
+def test_recorder_refuses_missing_or_short_key(tmp_path, monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("TRACE_KEY")
+    else:
+        monkeypatch.setenv("TRACE_KEY", value)
+    with pytest.raises(tr.KeyConfigError):
+        tr.Recorder(tmp_path / "t.jsonl", "r")

@@ -1,11 +1,14 @@
 """trace.py - tiny recorder that writes a tamper-evident JSONL trace of an agent run.
 
 Each line is one step: run_id, step, parent, tool, input, input_sha256, output,
-output_sha256, rc, start_ms, end_ms, prev_hash. prev_hash is the SHA-256 of the
-previous raw line (the first line chains to GENESIS). A sidecar "<trace>.head"
-file anchors the last line hash and step count so tail truncation is detectable.
+output_sha256, rc, start_ms, end_ms, prev_hash. prev_hash is HMAC-SHA256 of the
+previous raw line, keyed with the TRACE_KEY environment variable (the first line
+chains to GENESIS). Without the key nobody can recompute a valid chain. A
+sidecar "<trace>.head" file anchors the last line MAC and step count so tail
+truncation is detectable.
 
 Usage:
+    export TRACE_KEY=<at least 16 characters, kept secret>
     rec = Recorder("run.jsonl", "run-1")
     with rec.step("load_po", {"po_id": "PO-1"}) as s:
         s.output = {"found": True}
@@ -14,13 +17,35 @@ Usage:
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
 import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
 GENESIS = "0" * 64
+MIN_KEY_LEN = 16
+
+
+class KeyConfigError(Exception):
+    """TRACE_KEY is missing or too short."""
+
+
+def get_key(env: Optional[dict] = None) -> bytes:
+    raw = (os.environ if env is None else env).get("TRACE_KEY", "")
+    if not raw:
+        raise KeyConfigError("TRACE_KEY is not set; export TRACE_KEY with a secret of at least "
+                             f"{MIN_KEY_LEN} characters")
+    if len(raw.encode("utf-8")) < MIN_KEY_LEN:
+        raise KeyConfigError(f"TRACE_KEY is too short; use at least {MIN_KEY_LEN} characters")
+    return raw.encode("utf-8")
+
+
+def chain_hash(key: bytes, line: str) -> str:
+    """HMAC-SHA256(key, raw line), hex. This is the prev_hash of the next line."""
+    return hmac.new(key, line.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def canonical(obj: Any) -> str:
@@ -59,7 +84,8 @@ class Step:
 
 
 class Recorder:
-    def __init__(self, path: str | Path, run_id: str) -> None:
+    def __init__(self, path: str | Path, run_id: str, key: Optional[bytes] = None) -> None:
+        self.key = key if key is not None else get_key()
         self.path = Path(path)
         self.run_id = run_id
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,7 +125,7 @@ class Recorder:
         line = canonical(rec)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
-        self._prev = sha256_text(line)
+        self._prev = chain_hash(self.key, line)
         self._n += 1
         head_path(self.path).write_text(
             canonical({"run_id": self.run_id, "steps": self._n, "last_hash": self._prev}) + "\n",

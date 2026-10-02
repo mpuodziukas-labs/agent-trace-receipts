@@ -2,11 +2,12 @@
 invoices against synthetic purchase orders and records every step.
 
 Usage:
+    export TRACE_KEY=<secret, at least 16 characters>
     python3 agent.py                      # all invoices -> ./traces/
     python3 agent.py --invoice INV-1009   # one invoice
     python3 agent.py --data data --out traces
 
-Exit codes: 0 ok, 2 usage error.
+Exit codes: 0 ok, 2 usage error (including a missing TRACE_KEY).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from trace import Recorder
+from trace import KeyConfigError, Recorder, get_key
 
 HERE = Path(__file__).resolve().parent
 
@@ -93,8 +94,8 @@ TOOLS: dict[str, Callable[[Data, dict], Any]] = {
 }
 
 
-def reconcile(data: Data, invoice_id: str, trace_path: str | Path) -> dict:
-    rec = Recorder(trace_path, f"run-{invoice_id}")
+def reconcile(data: Data, invoice_id: str, trace_path: str | Path, key: Optional[bytes] = None) -> dict:
+    rec = Recorder(trace_path, f"run-{invoice_id}", key)
     last: Optional[int] = None
 
     def call(tool: str, inp: dict) -> Any:
@@ -137,8 +138,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.invoice and args.invoice not in data.invoices:
         ap.error(f"unknown invoice {args.invoice}")
     ids = [args.invoice] if args.invoice else sorted(data.invoices)
+    try:
+        key = get_key()
+    except KeyConfigError as exc:
+        ap.error(str(exc))
     for iid in ids:
-        out = reconcile(data, iid, Path(args.out) / f"run-{iid}.jsonl")
+        out = reconcile(data, iid, Path(args.out) / f"run-{iid}.jsonl", key)
         print(f"{iid} {out['outcome']}" + (f" ({out['reason']})" if "reason" in out else ""))
     return 0
 
