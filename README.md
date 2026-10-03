@@ -1,5 +1,9 @@
 # Agent Trace Receipts
 
+Proves: agent observability and audit trail (OpenTelemetry-style receipts). Verify in 60s: `python3 evaluate.py`.
+
+![CI](https://github.com/mpuodziukas-labs/agent-trace-receipts/actions/workflows/ci.yml/badge.svg)
+
 An agent that reconciles invoices against purchase orders saves analyst hours,
 but only if every step can be shown later: what it read, what it called, what
 came back, how long it took, and whether it failed. Silent failures cost money:
