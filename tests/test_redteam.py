@@ -51,8 +51,10 @@ def write_chain(dst, recs, key, renumber=True):
         lines.append(line)
         prev = link(key, line)
     Path(dst).write_text("\n".join(lines) + "\n")
+    mac_in = f"head\0{recs[0]['run_id']}\0{len(recs)}\0{lines[-1]}".encode()
+    mac = (hashlib.sha256(mac_in) if key is None else hmac.new(key, mac_in, hashlib.sha256)).hexdigest()
     Path(str(dst) + ".head").write_text(
-        canon({"run_id": recs[0]["run_id"], "steps": len(recs), "last_hash": prev}) + "\n")
+        canon({"run_id": recs[0]["run_id"], "steps": len(recs), "last_hash": prev, "mac": mac}) + "\n")
 
 
 @pytest.fixture(scope="module")
@@ -413,7 +415,7 @@ def test_cli_exit_0_all_good(tmp_path, data):
 
 README = (ROOT / "README.md").read_text()
 WORDS = {"six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
-         "thirteen": 13, "fourteen": 14, "fifteen": 15}
+         "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17}
 
 
 def test_readme_documents_key_and_hmac():

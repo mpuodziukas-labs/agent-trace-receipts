@@ -11,8 +11,12 @@ deterministic agent for its invoice, non-canonical or malformed lines.
 
 Usage:
     export TRACE_KEY=<secret, at least 16 characters>
-    python3 verify.py traces/ --data data
+    python3 verify.py traces/ --data data --expect
     python3 verify.py traces/run-INV-1009.jsonl
+
+Also refuses: a head anchor whose own MAC does not verify, a file whose name differs
+from its run_id, a duplicate run_id, and (with --expect) any run missing from or not
+listed in data/expected.json. A head one line behind is labelled as a recorder crash.
 
 Exit codes: 0 all traces verified, 1 at least one trace refused, 2 usage error
 (no traces, bad data directory, TRACE_KEY missing or too short).
@@ -32,7 +36,8 @@ from pathlib import Path
 from typing import Optional
 
 import agent
-from trace import GENESIS, KeyConfigError, canonical, chain_hash, error_output, get_key, head_path, sha256_json
+from trace import (GENESIS, KeyConfigError, canonical, chain_hash, error_output, get_key, head_mac,
+                   head_path, sha256_json)
 
 HERE = Path(__file__).resolve().parent
 
@@ -86,6 +91,8 @@ def check_chain(raw: list[str], steps: list[dict], key: bytes) -> list[str]:
 
 
 def check_head(raw: list[str], steps: list[dict], path: Path, key: bytes) -> list[str]:
+    """The head carries its own domain-separated MAC over run_id, step count and last line,
+    so it cannot be forged from a chain value (the dropped line's prev_hash)."""
     hp = head_path(path)
     if not hp.is_file():
         return ["head anchor missing"]
@@ -93,16 +100,26 @@ def check_head(raw: list[str], steps: list[dict], path: Path, key: bytes) -> lis
         head = json.loads(hp.read_bytes().decode("utf-8"))
     except (ValueError, RecursionError):
         return ["head anchor unreadable"]
-    if not isinstance(head, dict) or set(head) != {"run_id", "steps", "last_hash"}:
+    if not isinstance(head, dict) or set(head) != {"run_id", "steps", "last_hash", "mac"}:
         return ["head anchor unreadable"]
+    run_id = steps[0].get("run_id")
+    n, mac = head["steps"], head["mac"]
+    if not isinstance(mac, str) or not isinstance(run_id, str) or not _int(n):
+        return ["head anchor unreadable"]
+    if n == len(raw) - 1 and hmac.compare_digest(
+            mac, head_mac(key, run_id, n, raw[n - 1] if n else "")):
+        return [f"head anchor is one line behind ({n} of {len(raw)} lines): the recorder stopped "
+                "between the line write and the head write; incomplete run, not proof of tampering"]
     errs = []
-    if not _int(head["steps"]) or head["steps"] != len(raw):
-        errs.append(f"head anchor step count {head['steps']!r} != {len(raw)} lines")
+    if n != len(raw):
+        errs.append(f"head anchor step count {n!r} != {len(raw)} lines")
     last = head["last_hash"]
     if not isinstance(last, str) or not hmac.compare_digest(last, chain_hash(key, raw[-1])):
         errs.append("head anchor last hash mismatch")
-    if head["run_id"] != steps[0].get("run_id"):
+    if head["run_id"] != run_id:
         errs.append("head anchor run_id differs from the trace")
+    if not hmac.compare_digest(mac, head_mac(key, run_id, len(raw), raw[-1])):
+        errs.append("head anchor signature mismatch")
     return errs
 
 
@@ -235,15 +252,33 @@ def _verify(path: Path, data: agent.Data, key: bytes) -> Result:
     errors = check_shape(raw, steps)
     if errors:  # later checks assume the record shape
         return Result(path, False, errors, steps)
-    errors += check_chain(raw, steps, key)
-    errors += check_head(raw, steps, path, key)
-    errors += check_sequence(steps)
-    errors += check_times(steps)
-    errors += check_replay(steps, data)
-    errors += check_expected_run(steps, data, key)
-    errors += check_approve_after_failure(steps)
-    errors += check_approve_open_flag(steps)
+    errors = [e for _, errs in run_checks(raw, steps, path, data, key) for e in errs]
     return Result(path, not errors, errors, steps)
+
+
+CHECK_NAMES = ["chain", "head", "sequence", "times", "replay", "expected_run",
+               "approve_after_failure", "approve_open_flag"]
+
+
+def run_checks(raw: list[str], steps: list[dict], path: Path, data: agent.Data,
+               key: bytes) -> list[tuple[str, list[str]]]:
+    """Every check after shape, in order, each reporting on its own (no short circuit).
+    Looked up by name at call time so a stubbed check shows up in the attribution."""
+    me = sys.modules[__name__]
+    args = {"chain": (raw, steps, key), "head": (raw, steps, path, key), "sequence": (steps,),
+            "times": (steps,), "replay": (steps, data), "expected_run": (steps, data, key),
+            "approve_after_failure": (steps,), "approve_open_flag": (steps,)}
+    return [(n, getattr(me, "check_" + n)(*args[n])) for n in CHECK_NAMES]
+
+
+def firing_checks(path: str | Path, data: agent.Data, key: bytes) -> list[str]:
+    """Names of the checks that fire on this trace ("shape" alone if the shape is bad)."""
+    path = Path(path)
+    raw = path.read_text(encoding="utf-8")[:-1].split("\n")
+    steps = [json.loads(x) for x in raw]
+    if check_shape(raw, steps):
+        return ["shape"]
+    return [n for n, errs in run_checks(raw, steps, path, data, key) if errs]
 
 
 def flags_of(steps: list[dict]) -> list[str]:
@@ -256,19 +291,22 @@ def invoice_of(steps: list[dict]) -> Optional[str]:
     return None
 
 
-def mismatches_caught(results: list[Result], data: agent.Data) -> tuple[int, int]:
+def mismatches_caught(results: list[Result], data: agent.Data, full: bool = False) -> tuple[int, int]:
+    """full=True takes the denominator from expected.json, not from the files handed in."""
     caught = total = 0
+    if full:
+        total = sum(1 for e in data.expected.values() if e["outcome"] == "flagged")
     for r in results:
         iid = invoice_of(r.steps)
         exp = data.expected.get(iid or "")
         if exp and exp["outcome"] == "flagged":
-            total += 1
+            total += 0 if full else 1
             if r.ok and flags_of(r.steps) == [exp["reason"]] and not any(s["tool"] == "approve" for s in r.steps):
                 caught += 1
     return caught, total
 
 
-def report(results: list[Result], data: agent.Data) -> str:
+def report(results: list[Result], data: agent.Data, full: bool = False) -> str:
     steps = [s for r in results for s in r.steps]
     lat: dict[str, list[float]] = {}
     for s in steps:
@@ -279,7 +317,7 @@ def report(results: list[Result], data: agent.Data) -> str:
         v = lat[tool]
         lines.append(f"  {tool:<14} n={len(v):<3} p50={statistics.median(v):.3f} ms  max={max(v):.3f} ms")
     lines.append(f"failures (rc!=0 steps): {sum(1 for s in steps if s.get('rc') != 0)}")
-    c, t = mismatches_caught(results, data)
+    c, t = mismatches_caught(results, data, full)
     lines.append(f"mismatches caught: {c}/{t}" if t else "mismatches caught: n/a (no planted mismatches in these traces)")
     return "\n".join(lines)
 
@@ -291,10 +329,44 @@ def collect(paths: list[str]) -> list[Path]:
     return out
 
 
+def bind_names(results: list[Result]) -> None:
+    """The file name must be its run_id (for run-* files) and no run_id may appear twice."""
+    seen: dict[str, list[Result]] = {}
+    for r in results:
+        if not r.steps:
+            continue
+        rid = r.steps[0].get("run_id")
+        seen.setdefault(rid, []).append(r)
+        if r.path.name.startswith("run-") and r.path.name != f"{rid}.jsonl":
+            r.ok = False
+            r.errors.append(f"file name does not match its run_id {rid!r}")
+    for rid, group in seen.items():
+        if len(group) > 1:
+            for r in group:
+                r.ok = False
+                r.errors.append(f"duplicate run_id {rid!r} in {len(group)} files")
+
+
+def expected_set(paths: list[str], results: list[Result], data: agent.Data) -> tuple[list[str], int]:
+    """Compare what was handed in with the run list in expected.json (missing, extra, renamed)."""
+    want = {f"run-{iid}.jsonl" for iid in data.expected}
+    have = {r.path.name for r in results}
+    notes = [f"MISSING {n}: expected.json lists it, no such trace" for n in sorted(want - have)]
+    notes += [f"EXTRA {n}: not in expected.json" for n in sorted(have - want)]
+    for d in map(Path, paths):  # stray files in a trace directory (e.g. a renamed .bak)
+        if d.is_dir():
+            notes += [f"EXTRA {f.name}: not in expected.json" for f in sorted(d.iterdir())
+                      if f.name not in want and not f.name.endswith(".head") and f.name not in have]
+    return notes, len(want)
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="Verify agent traces; refuse tampered or unsafe ones.")
     ap.add_argument("traces", nargs="+", help="trace .jsonl files or directories")
     ap.add_argument("--data", default=str(HERE / "data"), help="data directory used for replay")
+    ap.add_argument("--expect", action="store_true",
+                    help="require exactly the runs listed in <data>/expected.json: missing, extra "
+                         "or renamed traces are refused and mismatch counts use that list")
     args = ap.parse_args(argv)
     paths = collect(args.traces)
     if not paths or not all(p.exists() for p in paths):
@@ -308,13 +380,25 @@ def main(argv: Optional[list[str]] = None) -> int:
     except (OSError, KeyError, ValueError) as exc:
         ap.error(f"cannot load data: {exc}")
     results = [verify_trace(p, data, key) for p in paths]
+    bind_names(results)
+    notes, total = [], len(results)
+    if args.expect:
+        if not data.expected:
+            ap.error("--expect needs expected.json in the data directory")
+        notes, total = expected_set(args.traces, results, data)
+        for r in results:
+            if r.path.name != f"{(r.steps[0].get('run_id') if r.steps else None)}.jsonl":
+                r.ok = False
+                r.errors.append("file name does not match its run_id")
     for r in results:
         if not r.ok:
-            print(f"REFUSED {r.path.name}: " + "; ".join(r.errors))
+            print(f"REFUSED {r.path.name}: " + "; ".join(dict.fromkeys(r.errors)))
+    for n in notes:
+        print(f"REFUSED {n}")
     good = [r for r in results if r.ok]
-    print(report(good, data))
-    print(f"verified {len(good)}/{len(results)} traces")
-    return 0 if len(good) == len(results) else 1
+    print(report(good, data, args.expect))
+    print(f"verified {len(good)}/{max(total, len(results))} traces")
+    return 0 if len(good) == len(results) and not notes else 1
 
 
 if __name__ == "__main__":

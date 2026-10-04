@@ -4,8 +4,10 @@ Each line is one step: run_id, step, parent, tool, input, input_sha256, output,
 output_sha256, rc, start_ms, end_ms, prev_hash. prev_hash is HMAC-SHA256 of the
 previous raw line, keyed with the TRACE_KEY environment variable (the first line
 chains to GENESIS). Without the key nobody can recompute a valid chain. A
-sidecar "<trace>.head" file anchors the last line MAC and step count so tail
-truncation is detectable.
+sidecar "<trace>.head" file anchors the step count and last line MAC, signed
+with its own domain-separated HMAC ("head" tag), so tail truncation is
+detectable and an outsider cannot forge a head from a chain value. The head is
+written atomically (temp file, fsync, rename) after the line is fsynced.
 
 Usage:
     export TRACE_KEY=<at least 16 characters, kept secret>
@@ -27,6 +29,7 @@ from typing import Any, Iterator, Optional
 
 GENESIS = "0" * 64
 MIN_KEY_LEN = 16
+MIN_DISTINCT_BYTES = 8
 
 
 class KeyConfigError(Exception):
@@ -40,12 +43,34 @@ def get_key(env: Optional[dict] = None) -> bytes:
                              f"{MIN_KEY_LEN} characters")
     if len(raw.encode("utf-8")) < MIN_KEY_LEN:
         raise KeyConfigError(f"TRACE_KEY is too short; use at least {MIN_KEY_LEN} characters")
+    if not raw.strip() or len(set(raw.encode("utf-8"))) < MIN_DISTINCT_BYTES:
+        raise KeyConfigError("TRACE_KEY is too weak; use at least "
+                             f"{MIN_DISTINCT_BYTES} distinct bytes and not only whitespace")
     return raw.encode("utf-8")
 
 
 def chain_hash(key: bytes, line: str) -> str:
     """HMAC-SHA256(key, raw line), hex. This is the prev_hash of the next line."""
     return hmac.new(key, line.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def head_mac(key: bytes, run_id: str, steps: int, last_line: str) -> str:
+    """Domain-separated MAC of the head anchor. Never equal to any line's prev_hash."""
+    msg = "head\0" + run_id + "\0" + str(steps) + "\0" + last_line
+    return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def write_head(path: Path, key: bytes, run_id: str, steps: int, last_hash: str, last_line: str) -> None:
+    """Atomic head write: temp file, fsync, rename. A crash leaves the old head intact."""
+    hp = head_path(path)
+    tmp = hp.with_name(hp.name + ".tmp")
+    body = canonical({"run_id": run_id, "steps": steps, "last_hash": last_hash,
+                      "mac": head_mac(key, run_id, steps, last_line)}) + "\n"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(body)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, hp)
 
 
 def canonical(obj: Any) -> str:
@@ -84,14 +109,19 @@ class Step:
 
 
 class Recorder:
-    def __init__(self, path: str | Path, run_id: str, key: Optional[bytes] = None) -> None:
+    def __init__(self, path: str | Path, run_id: str, key: Optional[bytes] = None,
+                 force: bool = False) -> None:
         self.key = key if key is not None else get_key()
         self.path = Path(path)
         self.run_id = run_id
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text("", encoding="utf-8")
+        # exclusive create: never destroy an earlier trace unless the caller says --force
+        with self.path.open("w" if force else "x", encoding="utf-8"):
+            pass
         self._n = 0
         self._prev = GENESIS
+        self._last_line = ""
+        write_head(self.path, self.key, self.run_id, 0, GENESIS, "")
 
     @contextmanager
     def step(self, tool: str, input: Any, parent: Optional[int] = None) -> Iterator[Step]:
@@ -125,9 +155,9 @@ class Recorder:
         line = canonical(rec)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
+            f.flush()
+            os.fsync(f.fileno())  # the line is durable before the head moves
         self._prev = chain_hash(self.key, line)
         self._n += 1
-        head_path(self.path).write_text(
-            canonical({"run_id": self.run_id, "steps": self._n, "last_hash": self._prev}) + "\n",
-            encoding="utf-8",
-        )
+        self._last_line = line
+        write_head(self.path, self.key, self.run_id, self._n, self._prev, line)

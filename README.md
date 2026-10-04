@@ -19,7 +19,7 @@ API key, no model.
 ```bash
 export TRACE_KEY=demo-key-not-secret-0   # demo value; use your own secret, 16+ characters
 python3 agent.py --out traces      # run the scripted agent, write one trace per invoice
-python3 verify.py traces           # verify every trace, print the run report
+python3 verify.py traces --expect  # verify every trace against the run list, print the run report
 python3 evaluate.py                # run the tamper suite, print N/N results
 ```
 
@@ -51,12 +51,16 @@ if this block ever differs from the program output.
 | Planted mismatches caught | 11/11 |
 | Clean traces accepted | 19/19 |
 | Tampered traces refused: edit_line | 19/19 |
-| Tampered traces refused: delete_step | 19/19 |
+| Tampered traces refused: delete_step | 17/17 |
 | Tampered traces refused: reorder_steps | 19/19 |
 | Tampered traces refused: approve_after_failure | 3/3 |
 | Tampered traces refused: approve_open_flag | 8/8 |
 | Tampered traces refused: missing_end_time | 19/19 |
 | Tampered traces refused: rechain_unkeyed | 19/19 |
+| Tampered traces refused: truncate_unkeyed | 19/19 |
+| Tampered traces refused: noncanonical_with_key | 19/19 |
+| Tampered traces refused: bad_sequence_with_key | 19/19 |
+| Tampered traces refused: forge_output_with_key | 19/19 |
 | Tampered traces refused: truncate_with_key | 19/19 |
 | Tampered traces refused: drop_flag_with_key | 11/11 |
 | Tampered traces refused: approve_without_compare | 2/2 |
@@ -84,7 +88,7 @@ Each line carries the HMAC-SHA256 of the previous raw line in `prev_hash`.
 ```
 <!-- sample:end -->
 
-Running `python3 verify.py traces` over a directory prints a run report like:
+Running `python3 verify.py traces --expect` over a directory prints a run report like:
 
 ```
 traces: 19  steps: 69
@@ -110,13 +114,18 @@ Latencies are measured at run time and differ per machine, so they are not part 
   breaks the chain, and without the key nobody can recompute a valid one: an
   unkeyed hash chain can be rewritten end to end by anyone who can write the
   file, so this repo does not offer a plain-SHA-256 mode. A `.head` file next
-  to the trace stores the run id, step count and the keyed MAC of the last
-  line, so dropping the final step and rewriting the head is caught too.
+  to the trace stores the run id, step count, the keyed MAC of the last line
+  and its own domain-separated MAC (`HMAC(key, "head" + run_id + steps +
+  last line)`), which never equals any line's `prev_hash`, so an outsider who
+  drops the final step cannot forge the head. The head is written atomically
+  (temp file, fsync, rename) after the line is fsynced; a head that lags by
+  one line is reported as a recorder crash, not as tampering. The recorder
+  refuses to overwrite an existing trace unless you pass `--force`.
 - `agent.py`: a scripted reconciler with five tools (`load_invoice`,
   `load_po`, `compare_lines`, `flag_mismatch`, `approve`). Every call is
   recorded. A failed lookup is recorded with `rc=1`, then the invoice is flagged.
 - `verify.py`: checks the record shape and canonical encoding, the keyed
-  chain, the head anchor, step numbering, parents and times (finite,
+  chain, the signed head anchor, step numbering, parents and times (finite,
   non-negative, in order), then replays each recorded tool call against the
   data and compares hashes. Because the agent is deterministic, it also re-runs
   the agent for the invoice and requires every step (tool, parent, input,
@@ -124,18 +133,25 @@ Latencies are measured at run time and differ per machine, so they are not part 
   steps and runs that never reached approve or flag. Two business rules give
   named errors: no `approve` after a failed step, and no `approve` while a
   mismatch flag is open. It prints a run report (steps, per-tool p50 and max
-  latency, failures, mismatches caught). Any unexpected error refuses the trace
-  instead of crashing. Exit 0 verified, 1 refused, 2 usage (no traces, bad data
+  latency, failures, mismatches caught). A `run-*` file name must equal its
+  `run_id`, and no `run_id` may appear twice. With `--expect` the run list in
+  `data/expected.json` is the truth: a missing, extra or renamed trace is
+  refused and the mismatch denominator comes from that list. Any unexpected
+  error refuses the trace instead of crashing. Exit 0 verified, 1 refused, 2 usage (no traces, bad data
   directory, `TRACE_KEY` missing or short).
-- `evaluate.py`: runs the agent over every invoice, then applies thirteen
+- `evaluate.py`: runs the agent over every invoice, then applies seventeen
   tamper classes to the clean traces. Three are raw edits (edit a line, delete
-  a step, reorder steps). One is an outsider who edits a step and recomputes
-  the whole chain and head without the key (`rechain_unkeyed`). Nine are
+  a middle step, reorder steps). Two are outsiders without the key: one edits
+  a step and recomputes the whole chain and head (`rechain_unkeyed`), one
+  drops the last step and rewrites the head (`truncate_unkeyed`). Twelve are
   forgeries by an insider who holds the key and re-chains validly (approve
   after a failed step, approve with an open flag, blank end time, truncate,
   drop the flag, approve with no compare step, hide a mismatch in the compare
-  input, splice another run, reversed times), so only the replay, workflow and
-  time checks can catch them.
+  input, splice another run, reversed times, non-canonical encoding, a bad
+  step number, a doctored tool output), so only the shape, sequence, replay,
+  workflow and time checks can catch them. Each row counts as refused only
+  when the check that owns that class fires, so switching a check off lowers
+  its own row below N/N.
 
 Tests include planted-RED mutation tests: the chain keying, the expected-run
 check and the approve-after-failure check are each replaced with an
@@ -154,12 +170,13 @@ input and CLI contract tests, and checks of the README's own claims.
   (the recorder, and every verifier) can forge a trace, and there is no
   non-repudiation toward a third party. A key holder is still constrained by
   the replay and workflow checks, but can alter timestamps freely within the
-  ordering rules. Only length is enforced on the key, not strength. For an
+  ordering rules. The key must be at least 16 characters with at least 8 distinct
+  bytes and not only whitespace; beyond that, strength is on you. For an
   external auditor, use asymmetric signatures and keep the signing key off the
   host that runs the agent; that is not implemented here.
-- Deleting a whole trace file, or putting back an older valid trace, is not
-  detected: `verify.py` can only report on the files it is given
-  (`verified N/M`). Compare against the list of runs you expect.
+- Putting back an older valid trace is not detected. Deleting or renaming a
+  trace file is detected only with `--expect`; without it `verify.py` can only
+  report on the files it is given (`verified N/M`).
 - Steps are written when they finish and the trace is a single linear run.
   Concurrent or nested tool calls are not modeled.
 - The data directory is trusted. Replay checks a trace against the invoices
@@ -168,8 +185,22 @@ input and CLI contract tests, and checks of the README's own claims.
   verifies against the changed data.
 - Business rules are two examples for this invoice workflow. Other workflows
   need their own rules.
-- Synthetic data, one scripted agent, thirteen tamper classes. Real agents add
+- Synthetic data, one scripted agent, seventeen tamper classes. Real agents add
   failure modes this suite does not cover.
+
+## Hostile review 2026-10-04
+
+An independent adversarial review (`RED-RUN-REVIEW.txt`) found 7 issues: 2 high,
+3 medium, 2 low. All 7 are fixed, each with a test in
+`tests/test_hostile.py` that failed before the fix.
+
+- T1 high: the head copied a chain value, so a keyless truncation passed the head check. Fixed: the head has its own domain-separated MAC.
+- T2 high: a copied trace under another name hid a flagged invoice. Fixed: file name bound to `run_id`, duplicate `run_id` refused, denominator from `expected.json`.
+- T3 medium: a renamed trace dropped out silently. Fixed: `--expect` refuses missing and extra traces.
+- T4 medium: six checks could be switched off and the table stayed N/N. Fixed: each row needs its owning check to fire; four new classes.
+- T5 medium: a crash between line and head wrote an unexplained refusal. Fixed: atomic head, fsync order, labelled crash state.
+- T6 low: an all-whitespace key was accepted. Fixed: at least 8 distinct bytes and not only whitespace.
+- T7 low: re-running the agent destroyed the old trace. Fixed: exclusive create, `--force` to overwrite.
 
 ## Files
 
@@ -179,7 +210,8 @@ trace.py     hash-chained JSONL recorder
 verify.py    verifier and run report
 evaluate.py  agent run plus tamper suite
 data/        synthetic invoices, purchase orders, expected outcomes
-tests/       pytest suite (unit, red-team attacks, README parity, mutation tests)
+tests/       pytest suite (unit, red-team attacks, hostile-review findings, README parity, mutation tests)
+RED-RUN-REVIEW.txt  the hostile review findings table
 ```
 
 ## License

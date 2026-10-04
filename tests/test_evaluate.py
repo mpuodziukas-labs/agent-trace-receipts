@@ -13,7 +13,9 @@ import verify
 
 ROOT = Path(__file__).resolve().parent.parent
 CLASSES = ["edit_line", "delete_step", "reorder_steps", "approve_after_failure",
-           "approve_open_flag", "missing_end_time", "rechain_unkeyed", "truncate_with_key",
+           "approve_open_flag", "missing_end_time", "rechain_unkeyed", "truncate_unkeyed",
+           "noncanonical_with_key", "bad_sequence_with_key", "forge_output_with_key",
+           "truncate_with_key",
            "drop_flag_with_key", "approve_without_compare", "forge_compare_input",
            "splice_runs", "reversed_times"]
 

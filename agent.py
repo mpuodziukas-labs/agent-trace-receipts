@@ -7,7 +7,9 @@ Usage:
     python3 agent.py --invoice INV-1009   # one invoice
     python3 agent.py --data data --out traces
 
-Exit codes: 0 ok, 2 usage error (including a missing TRACE_KEY).
+Existing traces are never overwritten unless --force is given.
+
+Exit codes: 0 ok, 2 usage error (including a missing or weak TRACE_KEY, or an existing trace).
 """
 
 from __future__ import annotations
@@ -94,8 +96,9 @@ TOOLS: dict[str, Callable[[Data, dict], Any]] = {
 }
 
 
-def reconcile(data: Data, invoice_id: str, trace_path: str | Path, key: Optional[bytes] = None) -> dict:
-    rec = Recorder(trace_path, f"run-{invoice_id}", key)
+def reconcile(data: Data, invoice_id: str, trace_path: str | Path, key: Optional[bytes] = None,
+              force: bool = False) -> dict:
+    rec = Recorder(trace_path, f"run-{invoice_id}", key, force=force)
     last: Optional[int] = None
 
     def call(tool: str, inp: dict) -> Any:
@@ -130,6 +133,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--data", default=str(HERE / "data"), help="data directory")
     ap.add_argument("--out", default="traces", help="trace output directory")
     ap.add_argument("--invoice", help="reconcile only this invoice id")
+    ap.add_argument("--force", action="store_true", help="overwrite existing traces")
     args = ap.parse_args(argv)
     try:
         data = Data.load(args.data)
@@ -143,7 +147,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     except KeyConfigError as exc:
         ap.error(str(exc))
     for iid in ids:
-        out = reconcile(data, iid, Path(args.out) / f"run-{iid}.jsonl", key)
+        try:
+            out = reconcile(data, iid, Path(args.out) / f"run-{iid}.jsonl", key, force=args.force)
+        except FileExistsError as exc:
+            ap.error(f"{exc.filename} exists; pass --force to overwrite the earlier trace")
         print(f"{iid} {out['outcome']}" + (f" ({out['reason']})" if "reason" in out else ""))
     return 0
 
