@@ -255,7 +255,7 @@ def missing_key(recs):
 
 
 def tool_unicode_lookalike(recs):
-    recs[-1]["tool"] = "approve​"
+    recs[-1]["tool"] = "approve\u200b"
     return recs
 
 
@@ -328,7 +328,7 @@ MALFORMED = {
     "json_array": b"[1,2,3]\n",
     "null_line": b"null\n",
     "unhashable_tool": b'{"tool":["x"],"run_id":"r","step":0}\n',
-    "unicode_tool": '{"tool":"аpprove","run_id":"r","step":0}\n'.encode(),
+    "unicode_tool": '{"tool":"\u0430pprove","run_id":"r","step":0}\n'.encode(),
     "missing_keys": b"{}\n",
     "nan_literal": b'{"end_ms":NaN}\n',
     "no_trailing_newline_garbage": b'{"a":1}\n{',
