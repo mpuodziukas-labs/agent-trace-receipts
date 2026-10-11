@@ -1,0 +1,11 @@
+{
+  "expected_exit": 0,
+  "expected_line": "| Planted mismatches caught | 11/11 |",
+  "limitations": "The chain proves integrity, not the truth of tool outputs. The HMAC key is symmetric, so any key holder can forge a trace and there is no non-repudiation. Replaying an older valid trace is not detected. The trace is a single linear run and concurrent calls are not modeled. Scripted synthetic agents only.",
+  "outcome": "a tamper-evident audit trail for agent runs, where edited, deleted, reordered or forged steps are refused",
+  "repo": "agent-trace-receipts",
+  "schema": "proof-pack/1",
+  "scope": "synthetic data, fixed seed, offline",
+  "site": "https://puodziukas.dev/proof.json",
+  "verify_cmd": "python3 evaluate.py"
+}

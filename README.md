@@ -306,3 +306,5 @@ RED-RUN-REVIEW.txt  the hostile review findings table
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+Agent verification contract: [AGENTS.md](AGENTS.md)
