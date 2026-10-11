@@ -103,6 +103,37 @@ mismatches caught: 11/11
 
 Latencies are measured at run time and differ per machine, so they are not part of the results table.
 
+## Cost, latency and token metrics
+
+`metrics.py` reads a seeded synthetic traffic file (`data/traffic.jsonl`, 200 records) and prints
+p50/p95/p99 latency, total tokens, total cost and cost per request, per route and tool. Each record
+carries `route, tool, model, token_in, token_out, latency_ms`. `cost_usd` is computed from
+`data/pricing.json`, which is labelled "illustrative prices, not a vendor quote". No model call, no
+network. Percentiles use the nearest-rank method. A record with negative or non-integer tokens, a
+missing or non-finite latency, or an unknown model is refused (exit 1, the line number is named); an
+empty file is exit 2. These usage records are a separate file from the HMAC-chained step traces and
+are not covered by the chain.
+
+```bash
+python3 metrics.py              # report over data/traffic.jsonl
+python3 metrics.py --generate   # rewrite the traffic file (seed 7)
+```
+
+Output of `python3 metrics.py`, checked by a test against the real command:
+
+<!-- metrics:start -->
+```
+route/tool                         n  p50_ms  p95_ms  p99_ms  tok_in  tok_out  cost_usd   usd/req
+invoice_reconcile/approve         19     212    3997    3997   10154     1880  0.011868  0.000625
+invoice_reconcile/compare_lines   19     289    3929    3929   12573     2624  0.039577  0.002083
+invoice_reconcile/load_invoice    28     300    3312    3519   19994     5117  0.095192  0.003400
+mismatch_triage/compare_lines     40     140     808    4121   24499     5643  0.084554  0.002114
+mismatch_triage/flag_mismatch     34     168    1141    3409   22676     5373  0.089241  0.002625
+po_lookup/load_po                 60     211    3065    3833   36468     7697  0.105102  0.001752
+ALL                              200     277    3065    3929  126364    28334  0.425536  0.002128
+```
+<!-- metrics:end -->
+
 ## How it works
 
 - `trace.py`: a recorder (context manager). Each step is one JSONL line with
@@ -185,6 +216,8 @@ input and CLI contract tests, and checks of the README's own claims.
   verifies against the changed data.
 - Business rules are two examples for this invoice workflow. Other workflows
   need their own rules.
+- Metrics: synthetic traffic, seeded, with illustrative prices, not a vendor quote.
+  The numbers show the arithmetic works, not what any real system costs or how fast it runs.
 - Synthetic data, one scripted agent, seventeen tamper classes. Real agents add
   failure modes this suite does not cover.
 
@@ -209,7 +242,8 @@ agent.py     scripted reconciliation agent and tools
 trace.py     hash-chained JSONL recorder
 verify.py    verifier and run report
 evaluate.py  agent run plus tamper suite
-data/        synthetic invoices, purchase orders, expected outcomes
+metrics.py   token, latency and cost report over synthetic traffic
+data/        synthetic invoices, purchase orders, expected outcomes, traffic, illustrative pricing
 tests/       pytest suite (unit, red-team attacks, hostile-review findings, README parity, mutation tests)
 RED-RUN-REVIEW.txt  the hostile review findings table
 ```
