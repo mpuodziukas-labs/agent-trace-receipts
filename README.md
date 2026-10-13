@@ -103,6 +103,87 @@ mismatches caught: 11/11
 
 Latencies are measured at run time and differ per machine, so they are not part of the results table.
 
+## Cost, latency and token metrics
+
+`metrics.py` reads a seeded synthetic traffic file (`data/traffic.jsonl`, 200 records) and prints
+p50/p95/p99 latency, total tokens, total cost and cost per request, per route and tool. Each record
+carries `route, tool, model, token_in, token_out, latency_ms`. `cost_usd` is computed from
+`data/pricing.json`, which is labelled "illustrative prices, not a vendor quote". No model call, no
+network. Percentiles use the nearest-rank method. A record with negative or non-integer tokens, a
+missing or non-finite latency, or an unknown model is refused (exit 1, the line number is named); an
+empty file is exit 2. These usage records are a separate file from the HMAC-chained step traces and
+are not covered by the chain.
+
+```bash
+python3 metrics.py              # report over data/traffic.jsonl
+python3 metrics.py --generate   # rewrite the traffic file (seed 7)
+```
+
+Output of `python3 metrics.py`, checked by a test against the real command:
+
+<!-- metrics:start -->
+```
+route/tool                         n  p50_ms  p95_ms  p99_ms  tok_in  tok_out  cost_usd   usd/req
+invoice_reconcile/approve         19     212    3997    3997   10154     1880  0.011868  0.000625
+invoice_reconcile/compare_lines   19     289    3929    3929   12573     2624  0.039577  0.002083
+invoice_reconcile/load_invoice    28     300    3312    3519   19994     5117  0.095192  0.003400
+mismatch_triage/compare_lines     40     140     808    4121   24499     5643  0.084554  0.002114
+mismatch_triage/flag_mismatch     34     168    1141    3409   22676     5373  0.089241  0.002625
+po_lookup/load_po                 60     211    3065    3833   36468     7697  0.105102  0.001752
+ALL                              200     277    3065    3929  126364    28334  0.425536  0.002128
+```
+<!-- metrics:end -->
+
+## Multi-agent handoff, escalation and audit
+
+`multiagent.py` runs two scripted agents (intake and resolver) over three synthetic refund cases and
+writes both agents' steps to one existing HMAC-chained trace; the record shape is unchanged. A
+handoff record carries `from, to, reason, context_hash`, and the receiving agent writes a matching
+`receive` record. Escalation rule: confidence below 0.80, or a refund over 500, writes an `escalate`
+record to the human queue instead of acting. No action, handoff or receive may follow until a
+`human_approval` record for that escalation is on the chain.
+
+The verifier adds two checks on top of chain, head, sequence and times: every handoff has exactly one
+matching receive (same id, same receiving agent, same context hash), and nothing happens after an
+escalation without a human approval. Three planted tampers are made by a key holder who re-signs the
+chain, so only the new checks can catch them: a dropped handoff, an action after an escalation
+(the approval removed), and reordered records. Each is refused with a named reason. No model call, no network.
+
+```bash
+python3 multiagent.py
+```
+
+Output of `python3 multiagent.py`, checked by a test against the real command:
+
+<!-- multiagent:start -->
+```
+scenario: intake and resolver, 3 cases, one chained trace
+   0 act             intake   classify CASE-1
+   1 handoff         intake -> resolver H-1 (classified:refund) ctx=554ed1b2
+   2 receive         resolver got H-1 ctx=554ed1b2
+   3 act             resolver evaluate_refund CASE-1
+   4 act             resolver issue_refund CASE-1
+   5 act             intake   classify CASE-2
+   6 escalate        intake CASE-2 -> human queue (low_confidence)
+   7 human_approval  human:ops-queue approved escalation at step 6
+   8 handoff         intake -> resolver H-2 (classified:refund) ctx=68885586
+   9 receive         resolver got H-2 ctx=68885586
+  10 act             resolver evaluate_refund CASE-2
+  11 act             resolver issue_refund CASE-2
+  12 act             intake   classify CASE-3
+  13 handoff         intake -> resolver H-3 (classified:refund) ctx=c22af5a0
+  14 receive         resolver got H-3 ctx=c22af5a0
+  15 act             resolver evaluate_refund CASE-3
+  16 escalate        resolver CASE-3 -> human queue (policy:refund_over_limit)
+human queue: 1 escalation pending approval
+verification: 6/6 checks passed (chain, head, sequence, times, handoff_receive, escalation_gate)
+  planted dropped_handoff: refused (receive without handoff)
+  planted action_after_escalation: refused (action after escalation without human approval)
+  planted reordered_records: refused (receive before handoff)
+tamper suite: 3/3 refused with the expected reason
+```
+<!-- multiagent:end -->
+
 ## How it works
 
 - `trace.py`: a recorder (context manager). Each step is one JSONL line with
@@ -185,6 +266,12 @@ input and CLI contract tests, and checks of the README's own claims.
   verifies against the changed data.
 - Business rules are two examples for this invoice workflow. Other workflows
   need their own rules.
+- Metrics: synthetic traffic, seeded, with illustrative prices, not a vendor quote.
+  The numbers show the arithmetic works, not what any real system costs or how fast it runs.
+- Multi-agent scenario: both agents are scripted functions, not LLMs, writing one linear trace. The
+  checks prove the handoff and escalation records are complete and ordered, not that a real model's
+  confidence is calibrated or that the human approval came from a real person (the approver is a
+  recorded label, and a key holder can write one).
 - Synthetic data, one scripted agent, seventeen tamper classes. Real agents add
   failure modes this suite does not cover.
 
@@ -209,7 +296,9 @@ agent.py     scripted reconciliation agent and tools
 trace.py     hash-chained JSONL recorder
 verify.py    verifier and run report
 evaluate.py  agent run plus tamper suite
-data/        synthetic invoices, purchase orders, expected outcomes
+metrics.py   token, latency and cost report over synthetic traffic
+multiagent.py  two scripted agents, handoff and escalation records, and their verifier
+data/        synthetic invoices, purchase orders, expected outcomes, traffic, illustrative pricing
 tests/       pytest suite (unit, red-team attacks, hostile-review findings, README parity, mutation tests)
 RED-RUN-REVIEW.txt  the hostile review findings table
 ```
@@ -217,3 +306,5 @@ RED-RUN-REVIEW.txt  the hostile review findings table
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+Agent verification contract: [AGENTS.md](AGENTS.md)
