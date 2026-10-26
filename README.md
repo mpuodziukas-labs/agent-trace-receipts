@@ -1,4 +1,4 @@
-# Agent Trace Receipts
+# agent-trace-receipts
 
 Proves: agent observability and audit trail (OpenTelemetry-style receipts). Verify in 60s: `python3 evaluate.py`.
 
@@ -14,6 +14,35 @@ HMAC-SHA256 chain keyed by a secret you hold) and ships a verifier that refuses
 a bad one. Zero marginal cost: Python standard library only, no network, no
 API key, no model.
 
+The title line this README carried before the standard layout, kept as written:
+
+```text
+# Agent Trace Receipts
+```
+
+## Ticket
+
+| Field | Value |
+|---|---|
+| Ticket | agent-trace-receipts 2026-10-25 |
+| Status | LIVE |
+| Severity of a false pass | A tampered, truncated or doctored agent trace is accepted because the evaluator printed all-N/N, and a wrong invoice approval can no longer be shown to be wrong from the record. |
+| Scope (in) | Recording a keyed hash-chained trace per agent run, verifying it (shape, chain, signed head, sequence, times, replay, business rules), the tamper suite, the synthetic metrics report and the multi-agent handoff demo. |
+| Out of scope | Truth of tool outputs, key management, non-repudiation toward a third party, older-valid-trace replacement and concurrent tool calls (see Limitations). |
+| Owner | Michael Puodziukas, michael@puodziukas.dev |
+| Opened | 2026-10-02 |
+| Last verified | 2026-10-25, `\| Tampered traces refused: reversed_times \| 19/19 \|` |
+| Oracle | `python3 evaluate.py`, last line `\| Tampered traces refused: reversed_times \| 19/19 \|`; `python3 mutants.py`, last line `mutants killed 18/18` |
+| Dependencies | Runtime: Python 3 standard library only. Test: pytest. |
+| Supported platforms | macOS (both oracles measured here, rc=0); Linux through the ubuntu-latest runner in .github/workflows/ci.yml (not measured here). |
+
+## Quick start
+
+```bash
+python3 evaluate.py
+python3 mutants.py
+```
+
 ## Quickstart
 
 ```bash
@@ -28,6 +57,39 @@ wrong key is refused (exit 2 for missing or short, 1 for a wrong key).
 `evaluate.py` makes its own random key per run.
 
 Tests: `pip install pytest && python3 -m pytest -v`. Run in place; this is not an installable package.
+
+## Normal procedure
+
+1. From the repo root run `python3 evaluate.py`. It needs no key from you, runs the scripted agent over every invoice, applies every tamper class to the clean traces and prints one table.
+2. Read the table. A row counts as refused only when the check that owns that tamper class fires. PASS means every row reads N/N. The first rows of the output read exactly:
+
+```text
+| Check | Result |
+|---|---|
+| Planted mismatches caught | 11/11 |
+```
+
+3. Run `python3 mutants.py` to prove the tests can fail. It copies the repo to a temporary directory, removes one defense at a time and requires the matching tests to go red. PASS ends with `mutants killed 18/18`.
+4. To verify real traces, export `TRACE_KEY` as in the Quickstart section, then run `python3 verify.py traces --expect`. Exit 0 means every trace verified, 1 means a trace was refused, 2 means a usage error.
+
+## Abnormal procedure
+
+| Symptom | Cause | Action | Oracle |
+|---|---|---|---|
+| `evaluate.py` exits 1 and a row is short of N/N | A check no longer fires for the tamper class that row names, or the agent output changed | Find the row name in the table, then read the verifier check that owns that class in `verify.py` | `python3 evaluate.py` |
+| `verify.py` exits 2 | `TRACE_KEY` is missing or short, there are no traces, or the data directory is bad | Export a key of 16 or more characters and pass an existing trace directory | `python3 verify.py traces --expect` |
+| `verify.py` exits 1 and names a reason | The trace was edited, truncated, renamed or recorded with a different key | Read the named reason for the refused file and compare it with the key used by the recorder | `python3 verify.py traces --expect` |
+| `agent.py` refuses to write a trace | The trace file already exists and the recorder will not overwrite it | Pass `--force` only when the old trace is not needed | `python3 agent.py --out traces --force` |
+| `mutants.py` prints a LIVE line | A removed defense that the tests do not detect, which is a gap in the tests | Add or tighten a test until that line prints RED | `python3 mutants.py` |
+| `mutants.py` prints `control FAIL` or `pattern matched` | The unmodified tests fail in the copy (for example pytest is missing), or the source line a mutant targets has moved | Run `pip install pytest`, or update the pattern in `mutants.py` | `python3 mutants.py` |
+
+## Emergency procedure
+
+A trace verified but the recorded run is wrong in production: a doctored trace was accepted.
+
+1. Freeze: stop treating traces from the affected recorder as evidence, treat `TRACE_KEY` as exposed and record the repo commit and the trace file that misled you.
+2. Replay: run `python3 verify.py` over the offending trace directory with the real key. If it exits 0, add the tamper as a new class in `evaluate.py` and a matching mutant in `mutants.py`, fix the owning check in `verify.py`, then run `python3 evaluate.py` and `python3 mutants.py` and expect every count N/N.
+3. Tell: the owner (michael@puodziukas.dev) and everyone who relied on the trace. Name the missing check and the Limitations item that covers it.
 
 ## Honesty Statement
 
@@ -274,6 +336,7 @@ input and CLI contract tests, and checks of the README's own claims.
   recorded label, and a key holder can write one).
 - Synthetic data, one scripted agent, seventeen tamper classes. Real agents add
   failure modes this suite does not cover.
+- The pytest suite was not run for the README restructuring; only the two oracles named in the Ticket were run.
 
 ## Hostile review 2026-10-04
 
@@ -291,7 +354,7 @@ An independent adversarial review (`RED-RUN-REVIEW.txt`) found 7 issues: 2 high,
 
 ## Files
 
-```
+```text
 agent.py     scripted reconciliation agent and tools
 trace.py     hash-chained JSONL recorder
 verify.py    verifier and run report
@@ -302,6 +365,50 @@ data/        synthetic invoices, purchase orders, expected outcomes, traffic, il
 tests/       pytest suite (unit, red-team attacks, hostile-review findings, README parity, mutation tests)
 RED-RUN-REVIEW.txt  the hostile review findings table
 ```
+
+## Architecture
+
+| Path | Role | Lines |
+|---|---|---|
+| `agent.py` | Scripted reconciliation agent and its five tools | 159 |
+| `trace.py` | Keyed hash-chained JSONL recorder | 163 |
+| `verify.py` | Verifier: shape, chain, head, sequence, times, replay, business rules | 405 |
+| `evaluate.py` | The oracle: agent run plus tamper suite, prints the table | 376 |
+| `metrics.py` | Token, latency and cost report over synthetic traffic | 170 |
+| `multiagent.py` | Two scripted agents with handoff and escalation records | 258 |
+| `mutants.py` | Mutation check: removes one defense per copy and requires red tests | 74 |
+| `.github/workflows/ci.yml` | CI workflow | 35 |
+| `data/` | Synthetic invoices, purchase orders, expected outcomes, traffic, pricing | none: directory |
+| `tests/` | Pytest suite | none: directory |
+
+Data flow:
+
+1. `agent.py` runs the scripted agent and `trace.py` writes one keyed JSONL trace and head file per invoice.
+2. `verify.py` checks each trace and, with `--expect`, the run list in `data/expected.json`.
+3. `evaluate.py` applies every tamper class to the clean traces and counts the refusals.
+4. `evaluate.py` prints the table and exits with code zero only when every count is N/N.
+5. `mutants.py` removes one defense at a time from a copy and requires `tests/` to go red.
+
+## Test and mutation evidence
+
+Measured on 2026-10-25 on macOS by running both oracles from the repo root. Each exited with code zero (rc=0). Last line of `python3 evaluate.py`:
+
+```text
+| Tampered traces refused: reversed_times | 19/19 |
+```
+
+Last line of `python3 mutants.py`:
+
+```text
+mutants killed 18/18
+```
+
+## Change log
+
+| Date | Change | Oracle after |
+|---|---|---|
+| 2026-10-25 | Additive restructuring to the README standard: sections added, no old line altered | `python3 evaluate.py` last line `\| Tampered traces refused: reversed_times \| 19/19 \|`; `python3 mutants.py` last line `mutants killed 18/18` |
+| 2026-10-04 | Hostile review fixes (date from the Hostile review section) | none: no oracle output was recorded for that review in this README |
 
 ## License
 
