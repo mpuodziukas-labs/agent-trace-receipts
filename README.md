@@ -2,6 +2,8 @@
 
 Proves: agent observability and audit trail (OpenTelemetry-style receipts). Verify in 60s: `python3 evaluate.py`.
 
+Where this fits: NIST AI RMF function MEASURE. Sources in SOURCES.md.
+
 ![CI](https://github.com/mpuodziukas-labs/agent-trace-receipts/actions/workflows/ci.yml/badge.svg)
 
 An agent that reconciles invoices against purchase orders saves analyst hours,
