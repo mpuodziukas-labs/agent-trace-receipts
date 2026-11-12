@@ -340,6 +340,56 @@ input and CLI contract tests, and checks of the README's own claims.
   failure modes this suite does not cover.
 - The pytest suite was not run for the README restructuring; only the two oracles named in the Ticket were run.
 
+## Java verifier
+
+`java/` holds a second, independent implementation in Java 17 (JUnit 5 is the
+only dependency, and only for tests). It reads the trace files the Python
+recorder writes and checks them without importing any Python code. The Merkle
+part is our own design; the design follows RFC 6962/9162 as used by
+transparency logs such as Trillian and Rekor. No code was copied from them.
+
+What it proves:
+
+- `ChainVerifier` recomputes the keyed chain the way `trace.py` does: record
+  i must carry the HMAC-SHA256 of the raw bytes of line i-1 in `prev_hash`,
+  record 0 carries 64 zeros, and the `.head` file must match the record count,
+  the last line and its own domain-separated MAC. It reports OK or the first
+  broken record index. The committed fixture
+  `java/src/test/resources/fixtures/run-INV-1001.jsonl` was written by
+  `agent.py` with the demo key; Java accepts it and refuses a flipped byte, a
+  deleted record and two reordered records.
+- `MerkleLog` implements the RFC 6962 leaf hash `SHA-256(0x00 || leaf)`, node
+  hash `SHA-256(0x01 || left || right)`, the tree root, inclusion proofs and
+  consistency proofs, with the verification algorithms of RFC 9162 section 2.1.
+  The empty tree root is the SHA-256 of the empty string. Small-tree roots are
+  checked against `java/tools/merkle_ref.py`, a short Python reference that
+  builds the tree bottom up. Every inclusion and consistency proof for tree
+  sizes 1 to 64 verifies, and the same proofs fail with one bit flipped. A
+  seeded random loop covers larger trees.
+- `Main` is the command line: `verify <receipts>` exits 0 for an intact chain
+  and 1 for a broken one (2 for bad usage or a missing `TRACE_KEY`), and
+  `root <receipts>` prints the Merkle root over the lines of the file.
+
+Commands (Java 17 and Maven; `python3` for the live parity step):
+
+```bash
+bash scripts/verify-java.sh              # tests, CLI on the fixture, tampered copies, Python parity
+bash scripts/verify-java.sh --selftest   # plants four defects in a temp copy, expects RED each time
+cd java && mvn -q test
+TRACE_KEY=demo-key-not-secret-0 java -cp java/target/classes dev.puodziukas.receipts.Main verify \
+  java/src/test/resources/fixtures/run-INV-1001.jsonl
+```
+
+Measured on the current tree: 31 tests passed, 0 failed (11 chain, 15 Merkle,
+5 command line), and `--selftest` prints `selftest 5/5` (one clean copy green,
+four planted defects red).
+
+Limits: the Java side checks the chain and the head, not the tool replay or the
+business rules, which stay in `verify.py`. The Merkle root is a separate
+construct over the raw lines; the Python recorder does not publish a log, so
+inclusion and consistency proofs are verified locally and there is no log
+server. The chain still uses a shared HMAC key, so the key holder can forge it.
+
 ## Hostile review 2026-10-04
 
 An independent adversarial review (`RED-RUN-REVIEW.txt`) found 7 issues: 2 high,
@@ -366,6 +416,8 @@ multiagent.py  two scripted agents, handoff and escalation records, and their ve
 data/        synthetic invoices, purchase orders, expected outcomes, traffic, illustrative pricing
 tests/       pytest suite (unit, red-team attacks, hostile-review findings, README parity, mutation tests)
 RED-RUN-REVIEW.txt  the hostile review findings table
+java/        Java 17 verifier: chain check, Merkle log proofs, CLI, tests, fixture
+scripts/     verify-java.sh runs the Java tests, CLI checks and its own selftest
 ```
 
 ## Architecture
